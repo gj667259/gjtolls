@@ -1,0 +1,10 @@
+path: ./data  
+train: train  
+val: val  
+test: val # 可选
+
+names:
+  0: person
+  1: bicycle
+  2: car
+  3: motorcycle
