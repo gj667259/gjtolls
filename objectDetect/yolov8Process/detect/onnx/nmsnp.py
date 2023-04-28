@@ -33,31 +33,49 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
 
 
 def nms(prediction, conf_thres=0.25, nms_thres=0.45):
-    nc = prediction.shape[1] - 4  
-    mi = 4 + nc  
-    xc = prediction[:, 4:mi].max(1) > conf_thres  
+    nc = prediction.shape[1] - 4  # number of classes  default = 80
+    mi = 4 + nc  # mask start index
+    # print(prediction[:, 4:mi].shape)
+    xc = prediction[:, 4:mi].max(1) > conf_thres  # candidates
+
     output = [None for _ in range(len(prediction))]
     for i, image_pred in enumerate(prediction):
         image_pred = np.transpose(image_pred)
-        x = image_pred[xc[i]] 
+        x = image_pred[xc[i]] # confidence
+        # Detections matrix nx6 (xyxy, conf, cls)
         [box, cls, _] = np.split(x, (4, 4+nc), axis=1)
-        box = xywh2xyxy(box)  
+       
+        box = xywh2xyxy(box)  # center_x, center_y, width, height) to (x1, y1, x2, y2)
+
         conf, j = cls.max(1, keepdims=True), cls.argmax(1, keepdims=True)
+        # print(j)
         if not x.shape[0]:
             continue
+        
         detections = np.concatenate((box, conf, conf, j), 1)
+        #   获得预测结果中包含的所有种类
         unique_labels = np.unique(detections[:, -1])
+
         for c in unique_labels:
+            #   获得某一类得分筛选后全部的预测结果
             detections_class = detections[detections[:, -1] == c]
-            detections_class = detections_class[(-detections_class[:,4]).argsort()]        
+            
+            # 按照存在物体的置信度排序
+            detections_class = detections_class[(-detections_class[:,4]).argsort()]
+            
+            # 进行非极大抑制        
             max_detections = []
             while detections_class.shape[0]:
+                # 取出这一类置信度最高的，一步一步往下判断，判断重合程度是否大于nms_thres，如果是则去除掉
+                # max_detections.append(detections_class[0].unsqueeze(0))
                 max_detections.append(np.array([detections_class[0]]))
                 if len(detections_class) == 1:
                     break
                 ious = bbox_iou(max_detections[-1], detections_class[1:])
                 detections_class = detections_class[1:][ious < nms_thres]
+            # 堆叠
             max_detections = np.concatenate(max_detections)
+            
             output[i] = max_detections if output[i] is None else np.concatenate((output[i], max_detections))
     return output
 
