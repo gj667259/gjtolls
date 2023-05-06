@@ -9,6 +9,9 @@ import argparse
 import os
 import sys
 
+from easydict import EasyDict as edict
+import copy
+
 from model.getM import getModel 
 
 
@@ -30,6 +33,7 @@ def parse_opt():
     args = parser.parse_args()
     # print(type(args))
     return args
+
 
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -91,15 +95,22 @@ def main(args):
         net.train()
         running_loss = 0.0
         train_bar = tqdm(trainloader, file=sys.stdout)
+        train_acc_all = 0.0
+        train_acc = 0.0
         for s, data in enumerate(train_bar):
             images, labels = data
             optimizer.zero_grad()
             outputs = net(images.to(device))
+
+            train_y = torch.max(outputs, dim=1)[1]
+            train_acc_all += torch.eq(train_y, labels.to(device)).sum().item()
+
             loss = loss_function(outputs, labels.to(device))
             loss.backward()
             optimizer.step()
             running_loss += loss.item()  
             train_bar.desc = "train epoch[{}/{}] loss:{:.3f}".format(epoch + 1, args.epoch, loss)
+        train_acc = train_acc_all / train_num
         net.eval()
         acc = 0.0 
         with torch.no_grad():
@@ -110,8 +121,8 @@ def main(args):
                 predict_y = torch.max(outputs, dim=1)[1]
                 acc += torch.eq(predict_y, val_labels.to(device)).sum().item()
         val_accurate = acc / val_num
-        print('[epoch %d] train_loss: %.3f  val_accuracy: %.3f' %
-              (epoch + 1, running_loss / train_steps, val_accurate))
+        print('[epoch %d] train_loss: %.3f, train_acc: %.3f, val_accuracy: %.3f' %
+              (epoch + 1, running_loss / train_steps, train_acc, val_accurate))
 
         if val_accurate > best_acc:
             best_acc = val_accurate
@@ -119,5 +130,8 @@ def main(args):
 
 
 if __name__ == '__main__':
-    opt = parse_opt()
+    # opt = parse_opt()
+    opt = edict({'model':'alex', 'trainData':'data/ddd', 'split':1, 'testData':'', 'nc':2, 'optimizer':'Adam', 'lr':0.0002,
+           'saveName':'gg', 'batchSize':5, 'epoch':50, 'usePre':False
+    })
     main(opt)
